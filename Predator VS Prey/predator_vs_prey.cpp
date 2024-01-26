@@ -5,23 +5,39 @@
 #include <chrono>
 #include <thread>
 
+#ifdef _WIN32
+    #define CLEAR_SCREEN "cls"
+#else
+    #define CLEAR_SCREEN "clear"
+#endif
+
 using namespace std;
 
 // Constants for ecosystem parameters
 const int INITIAL_RABBITS = 32;
 const int INITIAL_FOXES = 17;
 const int INITIAL_WOLVES = 6;
+
 const int MAX_RABBITS = 500;
 const int MAX_FOXES = 500;
 const int MAX_WOLVES = 500;
-const double RABBIT_REPRODUCTION_RATE = 0.3;
-const double FOX_REPRODUCTION_RATE = 0.1;
-const double WOLF_REPRODUCTION_RATE = 0.1;
+
+const double RABBIT_REPRODUCTION_RATE = 0.8; 
+const double FOX_REPRODUCTION_RATE = 0.4;
+const double WOLF_REPRODUCTION_RATE = 0.2;
+
 const double FOX_EATEN_RATE = 0.2;
-const double WOLF_EATEN_RATE = 0.2;
-const double RABBIT_ENERGY_GAIN = 20.0;
-const double FOX_ENERGY_GAIN = 10.0;
+const double WOLF_EATEN_RATE = 0.1;
+
+const double RABBIT_ENERGY_GAIN = 8.0;
+const double FOX_ENERGY_GAIN = 7.0;
 const double WOLF_ENERGY_GAIN = 5.0;
+
+const double RABBIT_ENERGY_LOSS = 3.0;
+const double FOX_ENERGY_LOSS = 5.0;
+const double WOLF_ENERGY_LOSS = 7.0;
+
+const double DISEASE_DEATH_RATE = 0.05;
 
 // Class representing a Rabbit
 class Rabbit {
@@ -97,7 +113,7 @@ void printPopulation(const vector<Rabbit>& rabbits, const vector<Fox>& foxes, co
     }
     cout << endl;
 
-   cout << "Wolves:  " << wolves.size() << " ";
+    cout << "Wolves:  " << wolves.size() << " ";
     for (int i = 0; i < wolves.size(); ++i) {
         cout << "/\\_/\\ ";
     }
@@ -115,21 +131,23 @@ int main() {
     cout << "Press Enter to begin..." << endl;
     cin.get(); // Wait for user to press Enter
 
-    // Simulate ecosystem dynamics for 10 time steps
-    for (int i = 0; i < 10; ++i) {
+    // Simulate ecosystem dynamics for 100 time steps
+    for (int i = 0; i < 100; ++i) {
+        system(CLEAR_SCREEN); // Clear the terminal
         cout << "\n\n=== Time Step: " << i+1 << " ===" << endl;
         printPopulation(rabbits, foxes, wolves);
         this_thread::sleep_for(chrono::milliseconds(1000)); // Delay for better visualization
 
+        vector<string> events;
+
         // Reproduction of rabbits
         if (rabbits.size() < MAX_RABBITS) {
-            // Calculate the reproduction rate based on avaliable resources
-            double reproductionRate = static_cast<double>(MAX_RABBITS -  - rabbits.size()) / MAX_RABBITS;
-
-            int newRabbits = static_cast<int>(rabbits.size() * reproductionRate * RABBIT_REPRODUCTION_RATE);
+            // Calculate the reproduction rate based on available resources
+            double reproductionRate = static_cast<double>(MAX_RABBITS - rabbits.size()) / MAX_RABBITS;
+            int newRabbits = static_cast<int>(rabbits.size() * RABBIT_REPRODUCTION_RATE * reproductionRate);
             if (newRabbits > 0) {
                 rabbits.insert(rabbits.end(), newRabbits, Rabbit());
-                cout << "New Rabbits born! +" << newRabbits << endl;
+                events.push_back("New Rabbits born! +" + to_string(newRabbits));
             }
         }
 
@@ -137,11 +155,10 @@ int main() {
         if (foxes.size() < MAX_FOXES) {
             // Calculate the reproduction rate based on available resources
             double reproductionRate = static_cast<double>(MAX_FOXES - foxes.size()) / MAX_FOXES;
-
-            int newFoxes = static_cast<int>(foxes.size() * reproductionRate);
+            int newFoxes = static_cast<int>(foxes.size() * FOX_REPRODUCTION_RATE * reproductionRate);
             if (newFoxes > 0) {
-            foxes.insert(foxes.end(), newFoxes, Fox());
-            cout << "New Foxes born! +" << newFoxes << endl;
+                foxes.insert(foxes.end(), newFoxes, Fox());
+                events.push_back("New Foxes born! +" + to_string(newFoxes));
             }
         }
 
@@ -149,83 +166,102 @@ int main() {
         if (wolves.size() < MAX_WOLVES) {
             // Calculate the reproduction rate based on available resources
             double reproductionRate = static_cast<double>(MAX_WOLVES - wolves.size()) / MAX_WOLVES;
-
-            int newWolves = static_cast<int>(wolves.size() * reproductionRate);
+            int newWolves = static_cast<int>(wolves.size() * WOLF_REPRODUCTION_RATE * reproductionRate);
             if (newWolves > 0) {
                 wolves.insert(wolves.end(), newWolves, Wolf());
-                cout << "New Wolves born! +" << newWolves << endl;
+                events.push_back("New Wolves born! +" + to_string(newWolves));
+            }
         }
-    }
 
         // Foxes hunt rabbits
         for (auto& fox : foxes) {
             if (rabbits.empty()) break; // No more rabbits to hunt
-
             if (rand() / double(RAND_MAX) < FOX_EATEN_RATE) {
-                // Randomly select and remove a rabbit
-                int index = rand() % rabbits.size();
-                fox.increaseEnergy(RABBIT_ENERGY_GAIN); // Fox gains energy by eating
-                rabbits.erase(rabbits.begin() + index);
-                cout << "A fox caught a rabbit!" << endl;
+                // Randomly select and remove a random number of rabbits
+                int numCaught = rand() % (rabbits.size() + 1);
+                fox.increaseEnergy(RABBIT_ENERGY_GAIN * numCaught); // Fox gains energy by eating
+                rabbits.erase(rabbits.begin(), rabbits.begin() + numCaught);
+                events.push_back("A fox caught " + to_string(numCaught) + " rabbits!");
+                break; // Foxes can catch only once per time step
             }
         }
 
-
         // Wolf hunts fox
-        for (auto& Wolf : wolves) {
+        for (auto& wolf : wolves) {
             if (foxes.empty()) break; // No more foxes to hunt
-
             if (rand() / double(RAND_MAX) < WOLF_EATEN_RATE) {
-                // Randomly select and remove a fox
-                int index = rand() % foxes.size();
-                Wolf.increaseEnergy(FOX_ENERGY_GAIN); // Wolf gains energy by eating
-                foxes.erase(foxes.begin() + index);
-                cout << "A wolf caught a fox!" << endl;
+                // Randomly select and remove a random number of foxes
+                int numCaught = rand() % (foxes.size() + 1);
+                wolf.increaseEnergy(FOX_ENERGY_GAIN * numCaught); // Wolf gains energy by eating
+                foxes.erase(foxes.begin(), foxes.begin() + numCaught);
+                events.push_back("A wolf caught " + to_string(numCaught) + " foxes!");
+                break; // Wolves can catch only once per time step
             }
         }
 
         // Wolf hunts rabbit
-        for (auto& Wolf : wolves) {
+        for (auto& wolf : wolves) {
             if (rabbits.empty()) break; // No more rabbits to hunt
-
             if (rand() / double(RAND_MAX) < WOLF_EATEN_RATE) {
-                // Randomly select and remove a rabbit
-                int index = rand() % rabbits.size();
-                Wolf.increaseEnergy(RABBIT_ENERGY_GAIN); // Wolf gains energy by eating
-                rabbits.erase(rabbits.begin() + index);
-                cout << "A wolf caught a rabbit!" << endl;
+                // Randomly select and remove a random number of rabbits
+                int numCaught = rand() % (rabbits.size() + 1);
+                wolf.increaseEnergy(RABBIT_ENERGY_GAIN * numCaught); // Wolf gains energy by eating
+                rabbits.erase(rabbits.begin(), rabbits.begin() + numCaught);
+                events.push_back("A wolf caught " + to_string(numCaught) + " rabbits!");
+                break; // Wolves can catch only once per time step
             }
         }
 
-        // Update energy levels and remove dead rabbits, foxes and wolves
-        for (auto it = rabbits.begin(); it != rabbits.end();) {
-            it->decreaseEnergy(5.0); // Energy loss per time step
-            if (it->getEnergy() <= 0) {
-                it = rabbits.erase(it);
-                cout << "A rabbit died of exhaustion." << endl;
-            } else {
-                ++it;
+        // Introduce random deaths due to disease
+        for (auto& animal : rabbits) {
+            if (rand() / double(RAND_MAX) < DISEASE_DEATH_RATE) {
+                rabbits.pop_back();
+                events.push_back("A rabbit died from disease.");
             }
         }
 
-        for (auto it = foxes.begin(); it != foxes.end();) {
-            it->decreaseEnergy(10.0); // Energy loss per time step
-            if (it->getEnergy() <= 0) {
-                it = foxes.erase(it);
-                cout << "A fox died of starvation." << endl;
-            } else {
-                ++it;
+        for (auto& animal : foxes) {
+            if (rand() / double(RAND_MAX) < DISEASE_DEATH_RATE) {
+                foxes.pop_back();
+                events.push_back("A fox died from disease.");
             }
         }
 
-        for (auto it = wolves.begin(); it != wolves.end();) {
-            it->decreaseEnergy(10.0); // Energy loss per time step
-            if (it->getEnergy() <= 0) {
-                it = wolves.erase(it);
-                cout << "A wolf died of starvation." << endl;
-            } else {
-                ++it;
+        for (auto& animal : wolves) {
+            if (rand() / double(RAND_MAX) < DISEASE_DEATH_RATE) {
+                wolves.pop_back();
+                events.push_back("A wolf died from disease.");
             }
+        }
+
+        // Update energy levels and remove dead animals
+        for (auto& animal : rabbits) {
+            animal.decreaseEnergy(5.0); // Energy loss per time step
+            if (animal.getEnergy() <= 0) {
+                rabbits.pop_back();
+                events.push_back("A rabbit died of exhaustion.");
+            }
+        }
+
+        for (auto& animal : foxes) {
+            animal.decreaseEnergy(10.0); // Energy loss per time step
+            if (animal.getEnergy() <= 0) {
+                foxes.pop_back();
+                events.push_back("A fox died of starvation.");
+            }
+        }
+
+        for (auto& animal : wolves) {
+            animal.decreaseEnergy(10.0); // Energy loss per time step
+            if (animal.getEnergy() <= 0) {
+                wolves.pop_back();
+                events.push_back("A wolf died of starvation.");
+            }
+        }
+
+        // Print accumulated events
+        for (const auto& event : events) {
+            cout << event << endl;
         }
 
         cout << "\nPress Enter to continue..." << endl;
