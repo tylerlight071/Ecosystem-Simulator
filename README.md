@@ -25,12 +25,6 @@ g++ -o ecosystem_simulation ecosystem_simulation.cpp
 
 The simulation runs for 100 time steps, displaying the population dynamics and events at each step. Press Enter to advance to the next time step and witness the ecosystem in action.
 
-## Requirements
-
-- C++ Compiler (e.g., g++)
-- Standard C++ Library
-- Compatible Terminal/Command Prompt
-
 ## Parameters
 
 - Initial Population: 32 rabbits, 17 foxes, and 6 wolves
